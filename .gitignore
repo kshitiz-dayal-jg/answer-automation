@@ -1,0 +1,38 @@
+# --- admin-panel (Next.js) ---
+admin-panel/node_modules
+admin-panel/.pnp
+admin-panel/.pnp.*
+admin-panel/.yarn/*
+!admin-panel/.yarn/patches
+!admin-panel/.yarn/plugins
+!admin-panel/.yarn/releases
+!admin-panel/.yarn/versions
+admin-panel/coverage
+admin-panel/.next/
+admin-panel/out/
+admin-panel/build
+admin-panel/*.tsbuildinfo
+admin-panel/next-env.d.ts
+admin-panel/.vercel
+admin-panel/data/
+
+# --- automation (Python) ---
+automation/.venv
+automation/__pycache__/
+automation/**/__pycache__/
+automation/*.egg-info/
+automation/.pytest_cache/
+automation/.mypy_cache/
+automation/.ruff_cache/
+automation/dist/
+automation/build/
+
+# --- shared ---
+.DS_Store
+*.pem
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

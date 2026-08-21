@@ -1,0 +1,25 @@
+[project]
+name = "automation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "kshitiz-dayal-jg", email = "kshitiz.dayal@jungleegames.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+]
+
+[project.scripts]
+automation = "automation:main"
+scrape-opta-match = "automation.opta_scraper:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
