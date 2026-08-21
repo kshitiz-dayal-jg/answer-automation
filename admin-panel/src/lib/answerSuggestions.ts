@@ -8,6 +8,7 @@ type TemplateLogic =
   | { kind: "player-threshold"; stats: string[]; threshold: number };
 
 const TEMPLATE_LOGIC: Record<string, TemplateLogic> = {
+  "Who will win the match?": { kind: "team-compare", stats: ["goals"] },
   "Which team will have most cards?": { kind: "team-compare", stats: ["cards_yellow", "cards_red"] },
   "Which player will have the most fouls committed?": { kind: "player-max", stats: ["fouls_conceded"] },
   "Which player will have the most fouls won?": { kind: "player-max", stats: ["fouls_won"] },
@@ -94,16 +95,17 @@ export function suggestAnswer(
     const valueA = sumStats(teamA?.team_total, logic.stats);
     const valueB = sumStats(teamB?.team_total, logic.stats);
     if (valueA === valueB) {
+      const drawIndex = options.findIndex((o) => /^(draw|tie)$/i.test(o.trim()));
       return {
-        answer: "Tie",
+        answer: "Draw",
         summary: `Tied: ${teamAName} ${valueA} - ${teamBName} ${valueB}`,
-        suggestedOptionIndex: null,
+        suggestedOptionIndex: drawIndex !== -1 ? drawIndex : null,
       };
     }
     const winner = valueA > valueB ? teamAName : teamBName;
     return {
       answer: winner,
-      summary: `${winner} leads ${Math.max(valueA, valueB)} - ${Math.min(valueA, valueB)}`,
+      summary: `${winner} ${Math.max(valueA, valueB)} - ${Math.min(valueA, valueB)}`,
       suggestedOptionIndex: findOptionIndex(options, winner),
     };
   }
@@ -168,13 +170,21 @@ export function suggestAnswer(
 export async function getSuggestedAnswers(quizId: number): Promise<Record<number, Suggestion | null>> {
   const quiz = getQuiz(quizId);
   if (!quiz) throw new Error("Quiz not found");
+  if (!quiz.matchStartTime) throw new Error("Quiz is missing match date");
 
-  const scraped = await fetchScrapedData();
-  const teams = scraped.teams ?? [];
+  const date = quiz.matchStartTime.slice(0, 10);
+  const scraped = await fetchScrapedData({
+    date,
+    teamA: quiz.teamA,
+    teamB: quiz.teamB,
+  });
+  if (!scraped.teams?.length) {
+    throw new Error(scraped.note ?? "No player stats found for this match");
+  }
 
   const suggestions: Record<number, Suggestion | null> = {};
   for (const question of quiz.questions) {
-    suggestions[question.id] = suggestAnswer(question.text, question.options, teams, quiz.teamA, quiz.teamB);
+    suggestions[question.id] = suggestAnswer(question.text, question.options, scraped.teams, quiz.teamA, quiz.teamB);
   }
   return suggestions;
 }

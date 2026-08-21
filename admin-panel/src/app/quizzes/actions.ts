@@ -18,7 +18,7 @@ export async function createQuizAction(data: {
   if (!league) throw new Error("League is required");
   if (!teamA) throw new Error("Team A is required");
   if (!teamB) throw new Error("Team B is required");
-  if (!matchStartTime) throw new Error("Match start time is required");
+  if (!matchStartTime) throw new Error("Match date is required");
 
   const questions = data.questions.map((q) => ({
     text: q.text.trim(),

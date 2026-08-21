@@ -1,4 +1,5 @@
 export const QUESTION_TEMPLATES = [
+  "Who will win the match?",
   "Which team will have most cards?",
   "Which player will have the most fouls committed?",
   "Which player will have the most fouls won?",

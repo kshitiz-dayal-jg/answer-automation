@@ -4,8 +4,15 @@ import argparse
 import json
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 from bs4 import BeautifulSoup
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
+
+BASE_URL = "https://optaplayerstats.statsperform.com"
+LIVE_SCORES_URL = f"{BASE_URL}/en_GB/soccer"
+
 
 NO_STATS_NOTE = (
     "This page does not contain match statistics (cards, shots, fouls, etc.). "
@@ -98,6 +105,73 @@ def parse_player_stats(html: str) -> list[dict] | None:
     return teams or None
 
 
+def scrape_live_match(date: str, team_a: str, team_b: str, *, headless: bool = True) -> dict:
+    """Open Opta live scores for ``date``, open the matching fixture, wait for
+    player-stats widgets to render, then parse the page."""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        raise ValueError(f"date must be YYYY-MM-DD, got {date!r}")
+
+    url = f"{LIVE_SCORES_URL}?date={quote(date)}"
+    with sync_playwright() as p:
+        # Bundled Chromium is blocked by the CDN; system Chrome passes.
+        browser = p.chromium.launch(
+            channel="chrome",
+            headless=headless,
+            ignore_default_args=["--enable-automation"],
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        try:
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1400, "height": 900},
+                locale="en-GB",
+            )
+            page = context.new_page()
+            page.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            )
+            page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+            page.wait_for_selector("a.livescores-match-container", timeout=60_000)
+
+            match_href = page.evaluate(
+                """([teamA, teamB]) => {
+                  const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const a = normalize(teamA);
+                  const b = normalize(teamB);
+                  for (const link of document.querySelectorAll("a.livescores-match-container")) {
+                    const home = normalize(link.querySelector(".livescore-container-fixtures-competition-row-team-a")?.innerText || "");
+                    const away = normalize(link.querySelector(".livescore-container-fixtures-competition-row-team-b")?.innerText || "");
+                    if ((home === a && away === b) || (home === b && away === a)) {
+                      return link.getAttribute("href");
+                    }
+                  }
+                  return null;
+                }""",
+                [team_a, team_b],
+            )
+            if not match_href:
+                raise LookupError(f"No match found for {team_a} vs {team_b} on {date}")
+
+            match_url = match_href if match_href.startswith("http") else f"{BASE_URL}{match_href}"
+            page.goto(match_url, wait_until="domcontentloaded", timeout=60_000)
+            try:
+                page.wait_for_selector("ul.Opta-TabbedContent table.Opta-Striped", timeout=90_000)
+            except PlaywrightTimeoutError as err:
+                raise TimeoutError(
+                    "Match page loaded but player stats widgets did not render in time"
+                ) from err
+
+            html = page.content()
+        finally:
+            browser.close()
+
+    return parse_match_page(html)
+
+
 def _parse_team_table(team_name: str, table) -> dict:
     players = []
     team_total = None
@@ -115,7 +189,7 @@ def _parse_team_table(team_name: str, table) -> dict:
 def _absolute_url(href: str | None) -> str | None:
     if not href:
         return None
-    return href if href.startswith("http") else f"https://optaplayerstats.statsperform.com{href}"
+    return href if href.startswith("http") else f"{BASE_URL}{href}"
 
 
 def _teams_from_canonical(href: str) -> tuple[str | None, str | None]:
@@ -139,12 +213,29 @@ def _date_from_title(title: str) -> str | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Parse an Opta match page saved as HTML.")
-    parser.add_argument("html_file", type=Path, help="Path to the saved match page HTML")
+    parser = argparse.ArgumentParser(description="Scrape or parse an Opta match page.")
+    parser.add_argument("html_file", type=Path, nargs="?", help="Path to saved match page HTML")
+    parser.add_argument("--date", help="Match date YYYY-MM-DD (live scrape)")
+    parser.add_argument("--team-a", help="Home/away team name to match on live scores")
+    parser.add_argument("--team-b", help="Other team name to match on live scores")
+    parser.add_argument("--headed", action="store_true", help="Show the browser window")
     args = parser.parse_args()
 
-    html = args.html_file.read_text(encoding="utf-8")
-    print(json.dumps(parse_match_page(html), indent=2))
+    try:
+        if args.date or args.team_a or args.team_b:
+            if not (args.date and args.team_a and args.team_b):
+                parser.error("--date, --team-a, and --team-b are all required for live scrape")
+            result = scrape_live_match(args.date, args.team_a, args.team_b, headless=not args.headed)
+        elif args.html_file:
+            html = args.html_file.read_text(encoding="utf-8")
+            result = parse_match_page(html)
+        else:
+            parser.error("Provide an HTML file or --date/--team-a/--team-b")
+    except Exception as err:
+        print(str(err), file=__import__("sys").stderr)
+        raise SystemExit(1) from err
+
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

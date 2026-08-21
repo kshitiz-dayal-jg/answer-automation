@@ -8,6 +8,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/quiz
     return NextResponse.json(suggestions);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 404 });
+    const status = message === "Quiz not found" ? 404 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

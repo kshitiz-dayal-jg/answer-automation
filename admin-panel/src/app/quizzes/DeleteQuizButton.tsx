@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { deleteQuizAction } from "./actions";
 
-export function DeleteQuizButton({ id }: { id: number }) {
+export function DeleteQuizButton({ id, onDeleted }: { id: number; onDeleted?: () => void | Promise<void> }) {
   const [pending, startTransition] = useTransition();
 
   return (
@@ -14,6 +14,7 @@ export function DeleteQuizButton({ id }: { id: number }) {
         if (!confirm("Delete this quiz?")) return;
         startTransition(async () => {
           await deleteQuizAction(id);
+          await onDeleted?.();
         });
       }}
       className="text-sm text-red-600 hover:underline disabled:opacity-50"

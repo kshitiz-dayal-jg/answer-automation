@@ -30,9 +30,34 @@ export type ScrapedMatchData = {
   note?: string;
 };
 
-export async function fetchScrapedData(): Promise<ScrapedMatchData> {
-  const { stdout } = await execFileAsync("uv", ["run", "scrape-opta-match", HTML_FILE], {
-    cwd: AUTOMATION_DIR,
-  });
-  return JSON.parse(stdout);
+export type LiveScrapeParams = {
+  date: string;
+  teamA: string;
+  teamB: string;
+};
+
+export async function fetchScrapedData(params?: LiveScrapeParams): Promise<ScrapedMatchData> {
+  const args = params
+    ? ["run", "scrape-opta-match", "--date", params.date, "--team-a", params.teamA, "--team-b", params.teamB]
+    : ["run", "scrape-opta-match", HTML_FILE];
+
+  try {
+    const { stdout } = await execFileAsync("uv", args, {
+      cwd: AUTOMATION_DIR,
+      maxBuffer: 20 * 1024 * 1024,
+      timeout: 180_000,
+      env: {
+        ...process.env,
+        PATH: `${process.env.HOME ? `${process.env.HOME}/.local/bin:` : ""}${process.env.PATH ?? ""}`,
+      },
+    });
+    if (!stdout.trim()) {
+      throw new Error("Scraper returned no output");
+    }
+    return JSON.parse(stdout);
+  } catch (err) {
+    const e = err as { stderr?: string; message?: string };
+    const detail = e.stderr?.trim() || e.message || "Scraper failed";
+    throw new Error(detail);
+  }
 }

@@ -1,12 +1,29 @@
+"use client";
+
 import Link from "next/link";
-import { listQuizzes } from "@/lib/db";
+import { useEffect, useState } from "react";
+import type { QuizSummary } from "@/lib/db";
 import { formatMatchStartTime } from "@/lib/formatMatchStartTime";
 import { DeleteQuizButton } from "./DeleteQuizButton";
 
-export const dynamic = "force-dynamic";
-
 export default function QuizzesPage() {
-  const quizzes = listQuizzes();
+  const [quizzes, setQuizzes] = useState<QuizSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadQuizzes() {
+    setError(null);
+    try {
+      const res = await fetch("/api/quizzes");
+      if (!res.ok) throw new Error("Failed to fetch quizzes");
+      setQuizzes(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
+  }
+
+  useEffect(() => {
+    void loadQuizzes();
+  }, []);
 
   return (
     <div className="p-8">
@@ -20,9 +37,13 @@ export default function QuizzesPage() {
         </Link>
       </div>
 
-      {quizzes.length === 0 ? (
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
+      {quizzes === null && !error ? (
+        <p className="text-black/60 dark:text-white/60">Loading...</p>
+      ) : quizzes !== null && quizzes.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No quizzes yet.</p>
-      ) : (
+      ) : quizzes ? (
         <ul className="flex flex-col gap-2">
           {quizzes.map((quiz) => (
             <li
@@ -38,11 +59,11 @@ export default function QuizzesPage() {
                   {quiz.questionCount === 1 ? "" : "s"}
                 </div>
               </Link>
-              <DeleteQuizButton id={quiz.id} />
+              <DeleteQuizButton id={quiz.id} onDeleted={loadQuizzes} />
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function QuestionList({ quizId, questions }: { quizId: number; questions:
           disabled={pending}
           className="rounded-md bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
-          {pending ? "Fetching..." : "Fetch Answer"}
+          {pending ? "Fetching from Opta..." : "Fetch Answer"}
         </button>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>

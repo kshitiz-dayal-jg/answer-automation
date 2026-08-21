@@ -70,7 +70,7 @@ export function QuizForm() {
     setError(null);
 
     if (!league.trim() || !teamA.trim() || !teamB.trim() || !matchStartTime) {
-      setError("League, Team A, Team B, and match start time are required");
+      setError("League, Team A, Team B, and match date are required");
       return;
     }
     if (questions.some((q) => !q.template || q.options.some((o) => !o.trim()))) {
@@ -134,11 +134,12 @@ export function QuizForm() {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Match start time (IST)</label>
+        <label className="mb-1 block text-sm font-medium">Match date</label>
         <input
-          type="datetime-local"
+          type="date"
           value={matchStartTime}
           onChange={(e) => setMatchStartTime(e.target.value)}
+          required
           className="w-full rounded-md border border-black/20 px-3 py-2 dark:border-white/20 dark:bg-transparent [&::-webkit-calendar-picker-indicator]:invert"
         />
       </div>

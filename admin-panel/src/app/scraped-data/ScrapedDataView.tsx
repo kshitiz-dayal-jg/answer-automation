@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { fetchScrapedDataAction } from "./actions";
+import { useState } from "react";
 
 export function ScrapedDataView() {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  function handleFetch() {
+  async function handleFetch() {
     setError(null);
-    startTransition(async () => {
-      try {
-        setData(await fetchScrapedDataAction());
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
-    });
+    setPending(true);
+    try {
+      const res = await fetch("/api/scraped-data");
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Something went wrong");
+      setData(body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
